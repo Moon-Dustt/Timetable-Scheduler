@@ -1,7 +1,7 @@
 """
 app.py — Flask entry point
-Run: python app.py
-Open: http://localhost:5000
+Local:  python app.py
+Render: gunicorn "app:create_app()"
 """
 from flask import Flask, render_template, redirect, url_for
 from models import create_db, seed_time_slots, seed_constraints
@@ -10,11 +10,19 @@ import os
 
 def create_app():
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "timetable-secret-2024")
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "timetable-dev-secret")
 
-    engine, Session = create_db()
+    # On Render, use /tmp for SQLite (writable directory)
+    # Locally it just uses the project folder
+    if os.environ.get("RENDER"):
+        db_path = "sqlite:////tmp/timetable.db"
+    else:
+        db_path = "sqlite:///timetable.db"
+
+    engine, Session = create_db(db_path)
     app.config["Session"] = Session
 
+    # Auto-seed on startup
     s = Session()
     seed_time_slots(s)
     seed_constraints(s)
@@ -44,6 +52,9 @@ def create_app():
     def export(): return render_template("export.html", page="export")
 
     return app
+
+# This line is what gunicorn needs
+application = create_app()
 
 if __name__ == "__main__":
     app = create_app()
