@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — TimetableAI{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-value" id="sCourses">—</div><div class="stat-label">Courses</div></div>
+  <div class="stat-card"><div class="stat-value" id="sLecturers">—</div><div class="stat-label">Lecturers</div></div>
+  <div class="stat-card"><div class="stat-value" id="sRooms">—</div><div class="stat-label">Rooms</div></div>
+  <div class="stat-card"><div class="stat-value" id="sGroups">—</div><div class="stat-label">Student groups</div></div>
+  <div class="stat-card"><div class="stat-value" id="sSlots">—</div><div class="stat-label">Time slots</div></div>
+  <div class="stat-card"><div class="stat-value" id="sEntries">—</div><div class="stat-label">Scheduled entries</div></div>
+</div>
+<div class="card">
+  <div class="card-title">Setup checklist</div>
+  <div id="checklist"></div>
+</div>
+<div class="card">
+  <div class="card-title">Quick actions</div>
+  <div class="flex gap-12" style="flex-wrap:wrap">
+    <a href="/data-entry"    class="btn btn-outline">Add data</a>
+    <a href="/run-scheduler" class="btn btn-primary">Run scheduler</a>
+    <a href="/timetable"     class="btn btn-outline">View timetable</a>
+    <a href="/export"        class="btn btn-outline">Export</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadDashboard(){
+  const d = await api("GET","/dashboard");
+  document.getElementById("sCourses").textContent   = d.courses;
+  document.getElementById("sLecturers").textContent = d.lecturers;
+  document.getElementById("sRooms").textContent     = d.rooms;
+  document.getElementById("sGroups").textContent    = d.groups;
+  document.getElementById("sSlots").textContent     = d.time_slots;
+  document.getElementById("sEntries").textContent   = d.entries;
+  const steps=[
+    {label:"Add your courses",       done:d.courses>0,    link:"/data-entry"},
+    {label:"Add lecturers",          done:d.lecturers>0,  link:"/data-entry"},
+    {label:"Add rooms",              done:d.rooms>0,      link:"/data-entry"},
+    {label:"Add student groups",     done:d.groups>0,     link:"/data-entry"},
+    {label:"Run the scheduler",      done:d.has_schedule, link:"/run-scheduler"},
+    {label:"View your timetable",    done:d.has_schedule, link:"/timetable"},
+  ];
+  document.getElementById("checklist").innerHTML = steps.map(s=>`
+    <div class="flex items-center gap-12" style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+        background:${s.done?"var(--success)":"var(--bg3)"};border:1px solid ${s.done?"var(--success)":"var(--border)"}">
+        ${s.done?"<svg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'><polyline points='20 6 9 17 4 12'/></svg>":""}
+      </div>
+      <span style="flex:1;color:${s.done?"var(--muted)":"var(--text)"};text-decoration:${s.done?"line-through":"none"}">${s.label}</span>
+      ${!s.done?`<a href="${s.link}" class="btn btn-sm btn-outline">Go</a>`:""}
+    </div>`).join("");
+}
+document.addEventListener("DOMContentLoaded",loadDashboard);
+</script>
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Timetable — TimetableAI{% endblock %}
+{% block page_title %}Timetable{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px">
+  <div class="flex gap-8" style="flex-wrap:wrap">
+    <select id="fLevel" onchange="render()" style="width:auto">
+      <option value="">All levels</option>
+    </select>
+    <select id="fLec" onchange="render()" style="width:auto">
+      <option value="">All lecturers</option>
+    </select>
+    <select id="fRoom" onchange="render()" style="width:auto">
+      <option value="">All rooms</option>
+    </select>
+  </div>
+  <a href="/export" class="btn btn-outline btn-sm">Export</a>
+</div>
+
+<div class="card" id="ttCard">
+  <div class="tt-wrap">
+    <div id="ttContainer"></div>
+  </div>
+  <div id="ttEmpty" class="empty hidden">
+    No schedule yet. <a href="/run-scheduler" style="color:var(--accent)">Generate a timetable first.</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const DAYS  = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
+// Hours from 08:00 to 16:00 — school closes at 16:00
+const HOURS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00"];
+const COLORS = ["ec0","ec1","ec2","ec3","ec4","ec5","ec6","ec7"];
+let allEntries = [];
+let colorMap   = {};
+
+function courseColor(courseId){
+  if(!(courseId in colorMap)){
+    const keys = Object.keys(colorMap).length;
+    colorMap[courseId] = COLORS[keys % COLORS.length];
+  }
+  return colorMap[courseId];
+}
+
+function render(){
+  const fLevel = document.getElementById("fLevel").value;
+  const fLec   = document.getElementById("fLec").value;
+  const fRoom  = document.getElementById("fRoom").value;
+
+  let entries = allEntries;
+  if(fLevel) entries = entries.filter(e => String(e.course.level) === fLevel);
+  if(fLec)   entries = entries.filter(e => e.lecturer.name === fLec);
+  if(fRoom)  entries = entries.filter(e => e.room.name === fRoom);
+
+  if(!entries.length){
+    document.getElementById("ttContainer").innerHTML =
+      '<div class="empty">No entries match your filters.</div>';
+    return;
+  }
+
+  // Build lookup: day -> hour -> list of entries starting at that hour
+  const lookup = {};
+  entries.forEach(e => {
+    const d = e.slot.day;
+    const h = e.slot.start;
+    if(!lookup[d]) lookup[d] = {};
+    if(!lookup[d][h]) lookup[d][h] = [];
+    lookup[d][h].push(e);
+  });
+
+  // Build set of (day, hour) cells that are occupied by a span from an earlier row
+  const spanned = new Set();
+  entries.forEach(e => {
+    const dur  = e.course.session_duration || 1;
+    const startIdx = HOURS.indexOf(e.slot.start);
+    // Mark all hours after the first as spanned
+    for(let i = 1; i < dur; i++){
+      if(startIdx + i < HOURS.length){
+        spanned.add(e.slot.day + "__" + HOURS[startIdx + i]);
+      }
+    }
+  });
+
+  // Build HTML table (more reliable than CSS grid for spanning)
+  let html = `<table style="width:100%;border-collapse:collapse;min-width:680px">
+    <thead><tr>
+      <th style="width:65px;padding:10px 8px;text-align:right;font-size:11px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)"></th>
+      ${DAYS.map(d=>`<th style="padding:10px 6px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);background:var(--bg3);border-radius:6px;border-bottom:1px solid var(--border)">${d}</th>`).join("")}
+    </tr></thead>
+    <tbody>`;
+
+  HOURS.forEach((hour, hi) => {
+    html += `<tr>`;
+    // Time label
+    html += `<td style="padding:6px 8px 0 0;text-align:right;font-size:11px;color:var(--muted);vertical-align:top;white-space:nowrap">${hour}</td>`;
+
+    DAYS.forEach(day => {
+      const key = day + "__" + hour;
+      if(spanned.has(key)){
+        // This cell is covered by a rowspan above — skip it
+        return;
+      }
+      const dayEntries = (lookup[day]||{})[hour] || [];
+
+      if(dayEntries.length === 0){
+        html += `<td style="padding:2px;background:var(--bg3);border-radius:4px;min-height:44px;height:44px"></td>`;
+      } else {
+        // Calculate rowspan from max session duration of entries in this cell
+        const maxDur = Math.max(...dayEntries.map(e => e.course.session_duration || 1));
+        // Ensure rowspan doesn't go past 16:00
+        const actualSpan = Math.min(maxDur, HOURS.length - hi);
+
+        const entriesHtml = dayEntries.map(e => {
+          const col = courseColor(e.course.id);
+          const lname = e.lecturer.name.split(" ").slice(-1)[0];
+          return `<div class="tt-entry ${col}" style="margin-bottom:2px">
+            <div class="ec">${e.course.code}</div>
+            <div class="en">${e.course.name.length>22?e.course.name.substring(0,22)+"…":e.course.name}</div>
+            <div class="er">${e.room.name} (${e.room.capacity})</div>
+            <div class="el">${lname}</div>
+          </div>`;
+        }).join("");
+
+        html += `<td rowspan="${actualSpan}" style="padding:3px;background:var(--bg3);border-radius:4px;vertical-align:top">
+          ${entriesHtml}
+        </td>`;
+      }
+    });
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table>`;
+  document.getElementById("ttContainer").innerHTML = html;
+}
+
+async function loadTimetable(){
+  allEntries = await api("GET","/schedule");
+
+  if(!allEntries.length){
+    document.getElementById("ttEmpty").classList.remove("hidden");
+    document.getElementById("ttContainer").innerHTML = "";
+    return;
+  }
+
+  // Populate filters
+  const levels  = [...new Set(allEntries.map(e=>e.course.level))].sort((a,b)=>a-b);
+  const lecs    = [...new Set(allEntries.map(e=>e.lecturer.name))].sort();
+  const rooms   = [...new Set(allEntries.map(e=>e.room.name))].sort();
+
+  const lSel = document.getElementById("fLevel");
+  const leSel= document.getElementById("fLec");
+  const rSel = document.getElementById("fRoom");
+
+  levels.forEach(l => lSel.innerHTML += `<option value="${l}">${l} Level</option>`);
+  lecs.forEach(l   => leSel.innerHTML += `<option>${l}</option>`);
+  rooms.forEach(r  => rSel.innerHTML += `<option>${r}</option>`);
+
+  render();
+}
+
+document.addEventListener("DOMContentLoaded", loadTimetable);
+</script>
+{% endblock %}

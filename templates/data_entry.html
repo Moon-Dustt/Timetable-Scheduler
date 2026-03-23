@@ -1,0 +1,612 @@
+{% extends "base.html" %}
+{% block title %}Data Entry — TimetableAI{% endblock %}
+{% block page_title %}Data entry{% endblock %}
+{% block content %}
+<div class="tabs">
+  <button class="tab-btn" data-tab="tCourses">Courses</button>
+  <button class="tab-btn" data-tab="tLecturers">Lecturers</button>
+  <button class="tab-btn" data-tab="tRooms">Rooms</button>
+  <button class="tab-btn" data-tab="tGroups">Student groups</button>
+</div>
+
+<!-- ══ COURSES ══ -->
+<div class="tab-panel" id="tCourses">
+  <div class="card">
+    <div class="card-title">Add course</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Course code *</label>
+        <input id="cCode" placeholder="e.g. CSC411"/>
+      </div>
+      <div class="form-group">
+        <label>Course name *</label>
+        <input id="cName" placeholder="e.g. Artificial Intelligence"/>
+      </div>
+      <div class="form-group">
+        <label>Department *</label>
+        <input id="cDept" placeholder="e.g. Computer Science"/>
+      </div>
+      <div class="form-group">
+        <label>Level</label>
+        <select id="cLevel">
+          <option value="100">100 level</option>
+          <option value="200">200 level</option>
+          <option value="300">300 level</option>
+          <option value="400">400 level</option>
+          <option value="500">500 level</option>
+          <option value="600">600 level (Postgraduate)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Total hours per week</label>
+        <input id="cHours" type="number" min="1" max="20" value="4" placeholder="e.g. 4"/>
+        <span class="text-muted text-sm">Total hours this course runs in a week (e.g. 4 = 4 hrs total)</span>
+      </div>
+      <div class="form-group">
+        <label>Hours per class</label>
+        <input id="cDuration" type="number" min="1" max="4" value="2" placeholder="e.g. 2"/>
+        <span class="text-muted text-sm">How long each individual class is (e.g. 2 = 2-hr class). System schedules total÷this = sessions/week</span>
+      </div>
+      <div class="form-group">
+        <label>Number of enrolled students</label>
+        <input id="cEnrolled" type="number" min="1" value="30" placeholder="e.g. 80"/>
+        <span class="text-muted text-sm">Used to assign the right room size automatically</span>
+      </div>
+      <div class="form-group flex items-center gap-12" style="flex-direction:row;padding-top:18px">
+        <label class="toggle"><input type="checkbox" id="cLab"/><span class="toggle-slider"></span></label>
+        <span>Requires a lab room</span>
+      </div>
+    </div>
+    <div class="mt-16"><button class="btn btn-primary" onclick="addCourse()">Add course</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">All courses</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Code</th><th>Name</th><th>Dept</th><th>Level</th><th>Hrs/wk</th><th>Hrs/class</th><th>Classes/wk</th><th>Students</th><th>Lab</th><th></th></tr></thead>
+        <tbody id="coursesTbody"></tbody>
+      </table>
+      <div id="coursesEmpty" class="empty" style="display:none">No courses added yet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LECTURERS ══ -->
+<div class="tab-panel" id="tLecturers">
+  <div class="card">
+    <div class="card-title">Add lecturer</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Full name *</label>
+        <input id="lName" placeholder="e.g. Dr. Adeyemi"/>
+      </div>
+      <div class="form-group">
+        <label>Email address</label>
+        <input id="lEmail" type="email" placeholder="e.g. adeyemi@uni.edu"/>
+      </div>
+      <div class="form-group">
+        <label>Department *</label>
+        <input id="lDept" placeholder="e.g. Computer Science"/>
+      </div>
+      <div class="form-group">
+        <label>Max teaching hours per day</label>
+        <input id="lMaxHours" type="number" min="1" max="12" value="6" placeholder="e.g. 6"/>
+        <span class="text-muted text-sm">Maximum number of hours this lecturer can teach in a single day</span>
+      </div>
+      <div class="form-group full">
+        <label>Course codes this lecturer teaches</label>
+        <input id="lCodes" placeholder="e.g. CSC411, CSC302, CSC215"/>
+        <span class="text-muted text-sm">Separate multiple codes with commas. Must match codes added in the Courses tab</span>
+      </div>
+    </div>
+    <div class="mt-16"><button class="btn btn-primary" onclick="addLecturer()">Add lecturer</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">All lecturers</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Max hrs/day</th><th>Courses</th><th></th></tr></thead>
+        <tbody id="lecturersTbody"></tbody>
+      </table>
+      <div id="lecturersEmpty" class="empty" style="display:none">No lecturers added yet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ROOMS ══ -->
+<div class="tab-panel" id="tRooms">
+  <div class="card">
+    <div class="card-title">Add room</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Room name *</label>
+        <input id="rName" placeholder="e.g. B41"/>
+      </div>
+      <div class="form-group">
+        <label>Building / block</label>
+        <input id="rBuilding" placeholder="e.g. Engineering Block"/>
+      </div>
+      <div class="form-group">
+        <label>Maximum student capacity *</label>
+        <input id="rCapacity" type="number" min="1" value="60" placeholder="e.g. 90"/>
+        <span class="text-muted text-sm">Room will only be assigned to courses with fewer or equal students</span>
+      </div>
+      <div class="form-group">
+        <label>Room type</label>
+        <select id="rType">
+          <option value="lecture_hall">Lecture hall</option>
+          <option value="seminar_room">Seminar room</option>
+          <option value="lab">Computer / science lab</option>
+          <option value="tutorial">Tutorial room</option>
+        </select>
+      </div>
+      <div class="form-group flex items-center gap-12" style="flex-direction:row;padding-top:18px">
+        <label class="toggle"><input type="checkbox" id="rProjector" checked/><span class="toggle-slider"></span></label>
+        <span>Has projector</span>
+      </div>
+      <div class="form-group flex items-center gap-12" style="flex-direction:row;padding-top:18px">
+        <label class="toggle"><input type="checkbox" id="rComputers"/><span class="toggle-slider"></span></label>
+        <span>Has computers</span>
+      </div>
+    </div>
+    <div class="mt-16"><button class="btn btn-primary" onclick="addRoom()">Add room</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">All rooms</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Building</th><th>Capacity</th><th>Type</th><th>Projector</th><th>Computers</th><th></th></tr></thead>
+        <tbody id="roomsTbody"></tbody>
+      </table>
+      <div id="roomsEmpty" class="empty" style="display:none">No rooms added yet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STUDENT GROUPS ══ -->
+<div class="tab-panel" id="tGroups">
+  <div class="card">
+    <div class="card-title">Add student group</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Group name *</label>
+        <input id="gName" placeholder="e.g. 300 Level Computer Science"/>
+      </div>
+      <div class="form-group">
+        <label>Number of students *</label>
+        <input id="gSize" type="number" min="1" value="40" placeholder="e.g. 60"/>
+      </div>
+      <div class="form-group">
+        <label>Level</label>
+        <select id="gLevel">
+          <option value="100">100 level</option>
+          <option value="200">200 level</option>
+          <option value="300">300 level</option>
+          <option value="400">400 level</option>
+          <option value="500">500 level</option>
+          <option value="600">600 level (Postgraduate)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Programme</label>
+        <input id="gProgram" placeholder="e.g. BSc Computer Science"/>
+      </div>
+      <div class="form-group full">
+        <label>Course codes for this group</label>
+        <input id="gCodes" placeholder="e.g. CSC411, CSC402, CSC421"/>
+        <span class="text-muted text-sm">Separate multiple codes with commas. These are all courses this group attends</span>
+      </div>
+    </div>
+    <div class="mt-16"><button class="btn btn-primary" onclick="addGroup()">Add student group</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">All student groups</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Size</th><th>Level</th><th>Programme</th><th>Courses</th><th></th></tr></thead>
+        <tbody id="groupsTbody"></tbody>
+      </table>
+      <div id="groupsEmpty" class="empty" style="display:none">No student groups added yet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT MODALS ══ -->
+
+<!-- Edit Course Modal -->
+<div id="editCourseModal" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-title">Edit course</div>
+    <input type="hidden" id="ecId"/>
+    <div class="form-grid">
+      <div class="form-group"><label>Course code</label><input id="ecCode"/></div>
+      <div class="form-group"><label>Course name</label><input id="ecName"/></div>
+      <div class="form-group"><label>Department</label><input id="ecDept"/></div>
+      <div class="form-group"><label>Level</label>
+        <select id="ecLevel">
+          <option value="100">100 level</option><option value="200">200 level</option>
+          <option value="300">300 level</option><option value="400">400 level</option>
+          <option value="500">500 level</option><option value="600">600 level (PG)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Total hours per week</label><input id="ecHours" type="number" min="1"/></div>
+      <div class="form-group"><label>Hours per class</label><input id="ecDuration" type="number" min="1"/></div>
+      <div class="form-group"><label>Enrolled students</label><input id="ecEnrolled" type="number" min="1"/></div>
+      <div class="form-group flex items-center gap-12" style="flex-direction:row;padding-top:18px">
+        <label class="toggle"><input type="checkbox" id="ecLab"/><span class="toggle-slider"></span></label>
+        <span>Requires lab</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editCourseModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditCourse()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Lecturer Modal -->
+<div id="editLecturerModal" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-title">Edit lecturer</div>
+    <input type="hidden" id="elId"/>
+    <div class="form-grid">
+      <div class="form-group"><label>Full name</label><input id="elName"/></div>
+      <div class="form-group"><label>Email</label><input id="elEmail" type="email"/></div>
+      <div class="form-group"><label>Department</label><input id="elDept"/></div>
+      <div class="form-group"><label>Max hours per day</label><input id="elMaxHours" type="number" min="1"/></div>
+      <div class="form-group full"><label>Course codes</label><input id="elCodes" placeholder="e.g. CSC411, CSC302"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editLecturerModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditLecturer()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Room Modal -->
+<div id="editRoomModal" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-title">Edit room</div>
+    <input type="hidden" id="erId"/>
+    <div class="form-grid">
+      <div class="form-group"><label>Room name</label><input id="erName"/></div>
+      <div class="form-group"><label>Building</label><input id="erBuilding"/></div>
+      <div class="form-group"><label>Capacity</label><input id="erCapacity" type="number" min="1"/></div>
+      <div class="form-group"><label>Room type</label>
+        <select id="erType">
+          <option value="lecture_hall">Lecture hall</option>
+          <option value="seminar_room">Seminar room</option>
+          <option value="lab">Lab</option>
+          <option value="tutorial">Tutorial room</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editRoomModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditRoom()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Group Modal -->
+<div id="editGroupModal" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-title">Edit student group</div>
+    <input type="hidden" id="egId"/>
+    <div class="form-grid">
+      <div class="form-group"><label>Group name</label><input id="egName"/></div>
+      <div class="form-group"><label>Size</label><input id="egSize" type="number" min="1"/></div>
+      <div class="form-group"><label>Level</label>
+        <select id="egLevel">
+          <option value="100">100 level</option><option value="200">200 level</option>
+          <option value="300">300 level</option><option value="400">400 level</option>
+          <option value="500">500 level</option><option value="600">600 level (PG)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Programme</label><input id="egProgram"/></div>
+      <div class="form-group full"><label>Course codes</label><input id="egCodes" placeholder="e.g. CSC411, CSC302"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editGroupModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditGroup()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+/* ── Helpers ── */
+function v(id){ return document.getElementById(id).value.trim(); }
+function ck(id){ return document.getElementById(id).checked; }
+function setV(id,val){ document.getElementById(id).value = val||""; }
+function setCk(id,val){ document.getElementById(id).checked = !!val; }
+
+function codeBadges(courses){
+  if(!courses||!courses.length) return '<span class="text-muted text-sm">None</span>';
+  return courses.map(c=>`<span class="badge badge-amber">${c.code}</span>`).join(" ");
+}
+
+function actionBtns(entity, id, editFn, delFn){
+  return `<div class="flex gap-8">
+    <button class="btn btn-sm btn-outline" onclick="${editFn}(${id})">Edit</button>
+    <button class="btn btn-sm btn-danger"  onclick="${delFn}(${id})">Delete</button>
+  </div>`;
+}
+
+/* ══ COURSES ══ */
+let _courses = [];
+
+async function loadCourses(){
+  _courses = await api("GET","/courses");
+  const tbody = document.getElementById("coursesTbody");
+  const empty = document.getElementById("coursesEmpty");
+  if(!_courses.length){ tbody.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  tbody.innerHTML = _courses.map(c=>`<tr>
+    <td><span class="badge badge-amber">${c.code}</span></td>
+    <td>${c.name}</td><td>${c.department}</td>
+    <td><span class="badge badge-blue">${c.level} lvl</span></td>
+    <td>${c.hours_per_week}</td><td>${c.session_duration}h</td><td>${c.sessions_per_week}x/wk</td>
+    <td>${c.enrolled_count}</td>
+    <td>${c.requires_lab?'<span class="badge badge-lab">Lab</span>':"—"}</td>
+    <td>${actionBtns("course",c.id,"editCourse","delCourse")}</td>
+  </tr>`).join("");
+}
+
+async function addCourse(){
+  const code=v("cCode"),name=v("cName"),dept=v("cDept");
+  if(!code){toast("Course code is required","danger");return;}
+  if(!name){toast("Course name is required","danger");return;}
+  if(!dept){toast("Department is required","danger");return;}
+  try{
+    const c = await api("POST","/courses",{
+      code, name, department:dept,
+      level:           parseInt(v("cLevel"))||100,
+      hours_per_week:  parseInt(v("cHours"))||4,
+      session_duration:parseInt(v("cDuration"))||2,
+      enrolled_count:  parseInt(v("cEnrolled"))||30,
+      requires_lab:    ck("cLab"),
+    });
+    toast(`Course ${c.code} added — ${c.sessions_per_week} class(es)/week of ${c.session_duration}h each`,"success");
+    setV("cCode",""); setV("cName",""); setV("cDept","");
+    document.getElementById("cHours").value="4";
+    document.getElementById("cDuration").value="2";
+    document.getElementById("cEnrolled").value="30";
+    document.getElementById("cLab").checked=false;
+    loadCourses();
+  } catch(e){toast(e.message,"danger");}
+}
+
+function editCourse(id){
+  const c = _courses.find(x=>x.id===id);
+  if(!c) return;
+  setV("ecId",c.id); setV("ecCode",c.code); setV("ecName",c.name);
+  setV("ecDept",c.department); setV("ecLevel",c.level);
+  setV("ecHours",c.hours_per_week); setV("ecDuration",c.session_duration);
+  setV("ecEnrolled",c.enrolled_count); setCk("ecLab",c.requires_lab);
+  openModal("editCourseModal");
+}
+
+async function saveEditCourse(){
+  const id = parseInt(v("ecId"));
+  try{
+    await api("PUT","/courses/"+id,{
+      code:v("ecCode"), name:v("ecName"), department:v("ecDept"),
+      level:parseInt(v("ecLevel")), hours_per_week:parseInt(v("ecHours")),
+      session_duration:parseInt(v("ecDuration")), enrolled_count:parseInt(v("ecEnrolled")),
+      requires_lab:ck("ecLab"),
+    });
+    closeModal("editCourseModal");
+    toast("Course updated","success");
+    loadCourses();
+  } catch(e){toast(e.message,"danger");}
+}
+
+async function delCourse(id){
+  if(!confirmDelete("Delete this course?")) return;
+  try{ await api("DELETE","/courses/"+id); toast("Course deleted","success"); loadCourses(); }
+  catch(e){toast(e.message,"danger");}
+}
+
+/* ══ LECTURERS ══ */
+let _lecturers = [];
+
+async function loadLecturers(){
+  _lecturers = await api("GET","/lecturers");
+  const tbody = document.getElementById("lecturersTbody");
+  const empty = document.getElementById("lecturersEmpty");
+  if(!_lecturers.length){ tbody.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  tbody.innerHTML = _lecturers.map(l=>`<tr>
+    <td>${l.name}</td>
+    <td>${l.email||"—"}</td>
+    <td>${l.department}</td>
+    <td>${l.max_hours_day}h</td>
+    <td>${codeBadges(l.courses)}</td>
+    <td>${actionBtns("lecturer",l.id,"editLecturer","delLecturer")}</td>
+  </tr>`).join("");
+}
+
+async function addLecturer(){
+  const name=v("lName"),dept=v("lDept");
+  if(!name){toast("Name is required","danger");return;}
+  if(!dept){toast("Department is required","danger");return;}
+  try{
+    const l = await api("POST","/lecturers",{
+      name, email:v("lEmail"), department:dept,
+      max_hours_day:parseInt(v("lMaxHours"))||6,
+      course_codes:v("lCodes"),
+    });
+    if(l.not_found&&l.not_found.length)
+      toast(`Lecturer added. Codes not found: ${l.not_found.join(", ")}`,"warning");
+    else
+      toast(`Lecturer added${l.courses.length?" — "+l.courses.map(c=>c.code).join(", ")+" assigned":""}`,"success");
+    setV("lName",""); setV("lEmail",""); setV("lDept",""); setV("lCodes","");
+    document.getElementById("lMaxHours").value="6";
+    loadLecturers();
+  } catch(e){toast(e.message,"danger");}
+}
+
+function editLecturer(id){
+  const l = _lecturers.find(x=>x.id===id);
+  if(!l) return;
+  setV("elId",l.id); setV("elName",l.name); setV("elEmail",l.email||"");
+  setV("elDept",l.department); setV("elMaxHours",l.max_hours_day);
+  setV("elCodes",l.courses.map(c=>c.code).join(", "));
+  openModal("editLecturerModal");
+}
+
+async function saveEditLecturer(){
+  const id = parseInt(v("elId"));
+  try{
+    await api("PUT","/lecturers/"+id,{
+      name:v("elName"), email:v("elEmail"), department:v("elDept"),
+      max_hours_day:parseInt(v("elMaxHours")), course_codes:v("elCodes"),
+    });
+    closeModal("editLecturerModal");
+    toast("Lecturer updated","success");
+    loadLecturers();
+  } catch(e){toast(e.message,"danger");}
+}
+
+async function delLecturer(id){
+  if(!confirmDelete("Delete this lecturer?")) return;
+  try{ await api("DELETE","/lecturers/"+id); toast("Lecturer deleted","success"); loadLecturers(); }
+  catch(e){toast(e.message,"danger");}
+}
+
+/* ══ ROOMS ══ */
+let _rooms = [];
+
+async function loadRooms(){
+  _rooms = await api("GET","/rooms");
+  const tbody = document.getElementById("roomsTbody");
+  const empty = document.getElementById("roomsEmpty");
+  if(!_rooms.length){ tbody.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  tbody.innerHTML = _rooms.map(r=>`<tr>
+    <td><strong>${r.name}</strong></td>
+    <td>${r.building||"—"}</td>
+    <td>${r.capacity} students</td>
+    <td>${r.room_type.replace(/_/g," ")}</td>
+    <td>${r.has_projector?"Yes":"No"}</td>
+    <td>${r.has_computers?"Yes":"No"}</td>
+    <td>${actionBtns("room",r.id,"editRoom","delRoom")}</td>
+  </tr>`).join("");
+}
+
+async function addRoom(){
+  const name=v("rName");
+  if(!name){toast("Room name is required","danger");return;}
+  try{
+    const r = await api("POST","/rooms",{
+      name, building:v("rBuilding"),
+      capacity:parseInt(v("rCapacity"))||30,
+      room_type:document.getElementById("rType").value,
+      has_projector:ck("rProjector"), has_computers:ck("rComputers"),
+    });
+    toast(`Room ${r.name} added (capacity: ${r.capacity})`,"success");
+    setV("rName",""); setV("rBuilding","");
+    document.getElementById("rCapacity").value="60";
+    loadRooms();
+  } catch(e){toast(e.message,"danger");}
+}
+
+function editRoom(id){
+  const r = _rooms.find(x=>x.id===id);
+  if(!r) return;
+  setV("erId",r.id); setV("erName",r.name); setV("erBuilding",r.building||"");
+  setV("erCapacity",r.capacity); setV("erType",r.room_type);
+  openModal("editRoomModal");
+}
+
+async function saveEditRoom(){
+  const id = parseInt(v("erId"));
+  try{
+    await api("PUT","/rooms/"+id,{
+      name:v("erName"), building:v("erBuilding"),
+      capacity:parseInt(v("erCapacity")), room_type:v("erType"),
+    });
+    closeModal("editRoomModal");
+    toast("Room updated","success");
+    loadRooms();
+  } catch(e){toast(e.message,"danger");}
+}
+
+async function delRoom(id){
+  if(!confirmDelete("Delete this room?")) return;
+  try{ await api("DELETE","/rooms/"+id); toast("Room deleted","success"); loadRooms(); }
+  catch(e){toast(e.message,"danger");}
+}
+
+/* ══ STUDENT GROUPS ══ */
+let _groups = [];
+
+async function loadGroups(){
+  _groups = await api("GET","/groups");
+  const tbody = document.getElementById("groupsTbody");
+  const empty = document.getElementById("groupsEmpty");
+  if(!_groups.length){ tbody.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  tbody.innerHTML = _groups.map(g=>`<tr>
+    <td>${g.name}</td>
+    <td>${g.size}</td>
+    <td><span class="badge badge-blue">${g.level} lvl</span></td>
+    <td>${g.program||"—"}</td>
+    <td>${codeBadges(g.courses)}</td>
+    <td>${actionBtns("group",g.id,"editGroup","delGroup")}</td>
+  </tr>`).join("");
+}
+
+async function addGroup(){
+  const name=v("gName");
+  if(!name){toast("Group name is required","danger");return;}
+  try{
+    const g = await api("POST","/groups",{
+      name, size:parseInt(v("gSize"))||1,
+      level:parseInt(v("gLevel"))||100,
+      program:v("gProgram"), course_codes:v("gCodes"),
+    });
+    toast(`Group "${g.name}" added`,"success");
+    setV("gName",""); setV("gProgram",""); setV("gCodes","");
+    document.getElementById("gSize").value="40";
+    loadGroups();
+  } catch(e){toast(e.message,"danger");}
+}
+
+function editGroup(id){
+  const g = _groups.find(x=>x.id===id);
+  if(!g) return;
+  setV("egId",g.id); setV("egName",g.name); setV("egSize",g.size);
+  setV("egLevel",g.level); setV("egProgram",g.program||"");
+  setV("egCodes",g.courses.map(c=>c.code).join(", "));
+  openModal("editGroupModal");
+}
+
+async function saveEditGroup(){
+  const id = parseInt(v("egId"));
+  try{
+    await api("PUT","/groups/"+id,{
+      name:v("egName"), size:parseInt(v("egSize")),
+      level:parseInt(v("egLevel")), program:v("egProgram"),
+      course_codes:v("egCodes"),
+    });
+    closeModal("editGroupModal");
+    toast("Group updated","success");
+    loadGroups();
+  } catch(e){toast(e.message,"danger");}
+}
+
+async function delGroup(id){
+  if(!confirmDelete("Delete this group?")) return;
+  try{ await api("DELETE","/groups/"+id); toast("Group deleted","success"); loadGroups(); }
+  catch(e){toast(e.message,"danger");}
+}
+
+/* ── Init ── */
+document.addEventListener("DOMContentLoaded",()=>{
+  loadCourses(); loadLecturers(); loadRooms(); loadGroups();
+});
+</script>
+{% endblock %}

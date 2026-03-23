@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Constraints — TimetableAI{% endblock %}
+{% block page_title %}Constraints{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-title">Hard constraints <span class="badge badge-hard" style="margin-left:8px">Never violated</span></div>
+  <p class="text-muted text-sm mb-16">These rules can never be broken. The optimizer will always satisfy them.</p>
+  <div id="hardList"></div>
+</div>
+<div class="card">
+  <div class="card-title">Soft constraints <span class="badge badge-soft" style="margin-left:8px">Preferred</span></div>
+  <p class="text-muted text-sm mb-16">The optimizer tries to satisfy these. You can adjust their importance using the weight value — higher weight = more important.</p>
+  <div id="softList"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadConstraints(){
+  const list = await api("GET","/constraints");
+  function render(items,cid){
+    document.getElementById(cid).innerHTML = items.map(c=>`
+      <div class="flex items-center gap-12" style="padding:13px 0;border-bottom:1px solid var(--border)">
+        <label class="toggle">
+          <input type="checkbox" ${c.active?"checked":""} onchange="toggleC(${c.id},this.checked)"/>
+          <span class="toggle-slider"></span>
+        </label>
+        <div style="flex:1">
+          <div style="font-weight:500">${c.name.replace(/_/g," ")}</div>
+          <div class="text-muted text-sm">${c.description}</div>
+        </div>
+        ${c.type==="soft"?`
+          <div class="flex items-center gap-8">
+            <span class="text-muted text-sm">Importance</span>
+            <input type="number" value="${c.weight}" min="1" max="500" step="1"
+              style="width:70px" onchange="updateW(${c.id},this.value)"/>
+          </div>`:`<span class="badge badge-hard">×${c.weight}</span>`}
+      </div>`).join("");
+  }
+  render(list.filter(c=>c.type==="hard"),"hardList");
+  render(list.filter(c=>c.type==="soft"),"softList");
+}
+async function toggleC(id,active){
+  try{ await api("PATCH","/constraints/"+id,{active}); toast("Updated","success"); }
+  catch(e){ toast(e.message,"danger"); }
+}
+async function updateW(id,weight){
+  try{ await api("PATCH","/constraints/"+id,{weight:parseFloat(weight)}); toast("Importance updated","success"); }
+  catch(e){ toast(e.message,"danger"); }
+}
+document.addEventListener("DOMContentLoaded",loadConstraints);
+</script>
+{% endblock %}

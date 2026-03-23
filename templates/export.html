@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Export — TimetableAI{% endblock %}
+{% block page_title %}Export{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-title">Download timetable</div>
+  <div class="flex gap-16" style="flex-wrap:wrap">
+    <div class="card" style="flex:1;min-width:180px;margin-bottom:0">
+      <div style="font-size:26px;margin-bottom:10px">📄</div>
+      <div style="font-weight:600;margin-bottom:6px">CSV</div>
+      <div class="text-muted text-sm" style="margin-bottom:14px">Open in Excel or Google Sheets</div>
+      <a href="/api/export/csv" class="btn btn-primary">Download CSV</a>
+    </div>
+    <div class="card" style="flex:1;min-width:180px;margin-bottom:0">
+      <div style="font-size:26px;margin-bottom:10px">{ }</div>
+      <div style="font-weight:600;margin-bottom:6px">JSON</div>
+      <div class="text-muted text-sm" style="margin-bottom:14px">Raw data for developers</div>
+      <a href="/api/export/json" class="btn btn-outline">Download JSON</a>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">Summary</div>
+  <div id="summary" class="text-muted">Loading...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadSummary() {
+  const st = await api("GET", "/schedule/status");
+  const el = document.getElementById("summary");
+  if (!st.has_schedule) {
+    el.innerHTML = 'No schedule found. <a href="/run-scheduler" style="color:var(--accent)">Run the scheduler first.</a>';
+    return;
+  }
+  const entries = await api("GET", "/schedule");
+  const courses   = new Set(entries.map(e=>e.course.name)).size;
+  const lecturers = new Set(entries.map(e=>e.lecturer.name)).size;
+  const rooms     = new Set(entries.map(e=>e.room.name)).size;
+  el.innerHTML = `<div class="stats-grid" style="margin-bottom:0">
+    <div class="stat-card"><div class="stat-value">${entries.length}</div><div class="stat-label">Total entries</div></div>
+    <div class="stat-card"><div class="stat-value">${courses}</div><div class="stat-label">Courses</div></div>
+    <div class="stat-card"><div class="stat-value">${lecturers}</div><div class="stat-label">Lecturers</div></div>
+    <div class="stat-card"><div class="stat-value">${rooms}</div><div class="stat-label">Rooms used</div></div>
+  </div>`;
+}
+document.addEventListener("DOMContentLoaded", loadSummary);
+</script>
+{% endblock %}

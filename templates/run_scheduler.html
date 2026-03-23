@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Run Scheduler — TimetableAI{% endblock %}
+{% block page_title %}Run scheduler{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-title">Optimizer settings</div>
+  <p class="text-muted text-sm mb-16">These settings control how hard the AI works to find the best timetable. The defaults work well for most cases — only change them if you need faster results or higher quality.</p>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Population size</label>
+      <input id="popSize" type="number" value="30" min="10" max="200" placeholder="Default: 30"/>
+      <span class="text-muted text-sm">How many different timetable versions the AI creates and compares each round. Higher = better results but slower. Recommended: 20–50.</span>
+    </div>
+    <div class="form-group">
+      <label>Number of generations</label>
+      <input id="maxGen" type="number" value="100" min="10" max="500" placeholder="Default: 100"/>
+      <span class="text-muted text-sm">How many improvement rounds the AI runs. More rounds = better timetable but takes longer. Recommended: 50–150.</span>
+    </div>
+    <div class="form-group">
+      <label>Mutation rate</label>
+      <input id="mutRate" type="number" value="0.12" min="0.01" max="0.5" step="0.01" placeholder="Default: 0.12"/>
+      <span class="text-muted text-sm">How often the AI randomly changes a slot/room to explore new options. Recommended: 0.05–0.20. Too high makes it random, too low makes it stuck.</span>
+    </div>
+    <div class="form-group">
+      <label>Quality target score</label>
+      <input id="targetScore" type="number" value="9000" min="1000" max="10000" placeholder="Default: 9000"/>
+      <span class="text-muted text-sm">The AI stops early if it reaches this score (max is 10000 = perfect schedule). Lower = finishes faster. Recommended: 8000–9500.</span>
+    </div>
+  </div>
+  <div class="mt-24">
+    <button class="btn btn-primary" id="runBtn" onclick="runScheduler()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Generate timetable
+    </button>
+  </div>
+</div>
+
+<div class="card hidden" id="progressCard">
+  <div class="card-title">Generating timetable...</div>
+  <div id="steps"></div>
+</div>
+
+<div class="card hidden" id="resultsCard">
+  <div class="card-title">Generation complete</div>
+  <div class="stats-grid" id="resultStats"></div>
+  <div class="flex gap-12 mt-16">
+    <a href="/timetable" class="btn btn-primary">View timetable</a>
+    <a href="/export"    class="btn btn-outline">Export</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const STEPS=[
+  {label:"Genetic algorithm",   desc:"Creating and evolving population of candidate timetables..."},
+  {label:"Constraint checking", desc:"Scoring each timetable against your rules..."},
+  {label:"Optimization",        desc:"Selecting and refining the best candidates..."},
+  {label:"Saving",              desc:"Writing final timetable to database..."},
+];
+
+function renderSteps(active){
+  document.getElementById("steps").innerHTML=STEPS.map((s,i)=>`
+    <div class="flex items-center gap-12" style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;
+        background:${i<active?"var(--success)":i===active?"var(--accent)":"var(--bg3)"};
+        color:${i<=active?"#fff":"var(--muted)"}">
+        ${i<active
+          ?"<svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'><polyline points='20 6 9 17 4 12'/></svg>"
+          :i===active?"<div class='spinner' style='width:16px;height:16px;border-width:2px'></div>"
+          :i+1}
+      </div>
+      <div>
+        <div style="font-weight:500;color:${i<=active?"var(--text)":"var(--muted)"}">${s.label}</div>
+        <div class="text-muted text-sm">${s.desc}</div>
+      </div>
+    </div>`).join("");
+}
+
+async function runScheduler(){
+  const btn=document.getElementById("runBtn");
+  btn.disabled=true; btn.textContent="Generating...";
+  document.getElementById("progressCard").classList.remove("hidden");
+  document.getElementById("resultsCard").classList.add("hidden");
+  renderSteps(0);
+
+  let step=0;
+  const iv=setInterval(()=>{ step=Math.min(step+1,2); renderSteps(step); },2500);
+
+  try{
+    const r=await api("POST","/run",{
+      population_size:parseInt(document.getElementById("popSize").value),
+      max_generations: parseInt(document.getElementById("maxGen").value),
+      mutation_rate:   parseFloat(document.getElementById("mutRate").value),
+      target_score:    parseFloat(document.getElementById("targetScore").value),
+    });
+    clearInterval(iv); renderSteps(4);
+    document.getElementById("resultsCard").classList.remove("hidden");
+    document.getElementById("resultStats").innerHTML=[
+      {label:"Quality score",    val:r.final_score+" / 10000",  color:"var(--accent)"},
+      {label:"Classes scheduled",val:r.entries,                 color:"var(--success)"},
+      {label:"Hard violations",  val:r.hard_violations,         color:r.hard_violations===0?"var(--success)":"var(--danger)"},
+      {label:"Schedule valid",   val:r.is_valid?"Yes":"No",     color:r.is_valid?"var(--success)":"var(--danger)"},
+    ].map(s=>`<div class="stat-card"><div class="stat-value" style="color:${s.color};font-size:22px">${s.val}</div><div class="stat-label">${s.label}</div></div>`).join("");
+    toast(r.hard_violations===0?"Timetable generated successfully!":"Timetable generated with some violations", r.hard_violations===0?"success":"warning");
+    updateStatus();
+  } catch(e){
+    clearInterval(iv);
+    toast(e.message,"danger");
+  } finally{
+    btn.disabled=false;
+    btn.innerHTML='<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Generate timetable';
+  }
+}
+</script>
+{% endblock %}
